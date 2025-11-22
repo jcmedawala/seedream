@@ -1,66 +1,80 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+
+import { useState } from 'react';
+import styles from './page.module.css';
+import EditorForm from '@/components/EditorForm';
+import ResultViewer from '@/components/ResultViewer';
+import { signOut } from './auth/actions';
 
 export default function Home() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<string>('');
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [originalUrl, setOriginalUrl] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (data: any) => {
+    setIsLoading(true);
+    setError(null);
+    setResultUrl(null);
+    setStatus('Generating image...');
+    setOriginalUrl(data.image_urls[0]); // Keep original URL for ResultViewer
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const responseData = await res.json();
+
+      if (responseData.error) {
+        throw new Error(responseData.error);
+      }
+
+      if (responseData.outputs && responseData.outputs.length > 0) {
+        setResultUrl(responseData.outputs[0]);
+        setStatus('Completed');
+      } else {
+        throw new Error('No output image returned');
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Something went wrong');
+      setStatus('Failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className={styles.main}>
+      <div className={styles.header}>
+        <div className={styles.topBar}>
+          <form action={signOut}>
+            <button className={styles.logoutButton}>Sign Out</button>
+          </form>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <h1>Seedream Editor</h1>
+        <p>AI-powered image editing with Seedream V4</p>
+      </div>
+
+      <EditorForm onSubmit={handleSubmit} isLoading={isLoading} />
+
+      {status && <div className={styles.status}>{status}</div>}
+
+      {error && (
+        <div className={styles.error}>
+          <strong>Error:</strong> {error}
         </div>
-      </main>
-    </div>
+      )}
+
+      {resultUrl && (
+        <ResultViewer resultUrl={resultUrl} originalUrl={originalUrl} />
+      )}
+    </main>
   );
 }
